@@ -28,7 +28,7 @@ Output: true
 
 '''
 class Solution:
-    def equationsPossible(self, equations: List[str]) -> bool:
+    def equationsPossible(self, equations: list[str]) -> bool:
         '''
         Make 2 adjacency lists for edges and non-edges
         Then when you get an equation as edge wz, check for wz or zw in Edges, if there, it's okay.             Else
@@ -39,6 +39,9 @@ class Solution:
         other side, False
         edges = {u:[v,w,x,z], v:[u,w], w:[u,v], z:[u]}
         '''
+        e_graph = {}
+        ne_graph = {}
+
         equalEdges = {}
         notEqualEdges = {}
 
@@ -54,29 +57,57 @@ class Solution:
                 otherSide = notEqualEdges
             else:
                 thisSide = notEqualEdges
-                otherside = equalEdges
+                otherSide = equalEdges
 
-            # check the dst in equalEdges
-            if z in equalEdges:
-                edgesFromZ = equalEdges[z]
-                for j in range(len(edgesFromZ)):
-                    # check if any dst's from this z on the other side contain the current w
-                    curr_dst = edgesFromZ[j]
-                    if curr_dst in notEqualEdges:
-                        notEqualDsts = notEqualEdges[curr_dst]
-                        if w in notEqualDsts:
-                            return False
-                    else:
-                        continue
-            # z is not a dst but w==z is the same as z==w
-            elif w in equalEdges:
-                edgesFromW = equalEdges[w]
-                for k in range(len(edgesFromW)):
-                    # check if any dst's from this z on the other side contain the current w
-                    curr_dst = edgesFromW[k]
-                    if curr_dst in notEqualEdges:
-                        notEqualDsts = notEqualEdges[curr_dst]
-                        if z in notEqualDsts:
-                            return False
-            elif operand is "!=":
-                pass
+            # wz so z is dst
+            if z in thisSide:
+                no_indirect = self.check_u(thisSide, otherSide, z, w)
+                if not no_indirect:
+                    return False
+            if w in thisSide:  #w is the zw destination
+                no_indirect = self.check_u(thisSide, otherSide, w, z)
+                if not no_indirect:
+                    return False
+            #neither vertex in thisSide so for case a!=b, a==b if both vertices in other side -> False
+            elif z in otherSide and w in otherSide:
+                return False
+            else: #only
+                thisSide[z]
+
+    def check_u(self, thisSide, otherSide, dst, start):
+        '''
+
+        :param thisSide:
+        :param otherSide:
+        :param vert: either w or z from equation, get list of edges from it and for each dst vertex, check otherSide, if
+        there, get list of edges, check dst vertices to see if z or w is there, if so return False
+        :return:
+        '''
+        edgesFromVert = thisSide[dst]
+        for j in range(len(edgesFromVert)):
+            # check if any dst's from this z on the
+            u = edgesFromVert[j]
+            if u in otherSide:  # check if wz zu's u in other side
+                otherSideDsts = otherSide[u]
+                if start in otherSideDsts:  # there is an indirect w->z->u->w that crosses from == to !=
+                    return False
+        return True
+
+if __name__=="__main__":
+    sol = Solution()
+
+    equations= ["a==b","b!=a"]
+    print(sol.equationsPossible(equations))
+
+    equations= ["b==a","a==b"]
+    print(sol.equationsPossible(equations))
+
+    equations= ["a==b","b==c","a==c"]
+    print(sol.equationsPossible(equations))
+
+    equations= ["a==b","b!=c","c==a"]
+    print(sol.equationsPossible(equations))
+
+    equations= ["c==c","b==d","x!=z"]
+    print(sol.equationsPossible(equations))
+
