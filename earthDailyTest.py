@@ -32,6 +32,8 @@ Add List = ['one', 'two', 'five', 'six]
 Delete List = ['two', 'five']
 
 Result List = ['three', 'six', 'one']*
+
+source: https://www.geeksforgeeks.org/python-program-for-merge-sort/
 '''
 def main(arr, addarr, delarr):
     '''
