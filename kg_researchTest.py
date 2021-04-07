@@ -18,7 +18,7 @@ def is_ordered_two(arr):
     T = [0 for x in range(len(arr))]
     T[0] = 1 # base case
     for i in range(1, len(arr)):
-        if arr[i] > arr[i-1]:
+        if arr[i] >= arr[i-1]:
             T[i] = T[i-1] + 1
         else:
             return False #not looking for longest increasing subsequence
