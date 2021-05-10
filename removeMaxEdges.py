@@ -1,3 +1,10 @@
+'''
+MST is a list of sets, from edges make al_edges = [ab + al]
+and bob_edges = [ab + bob]
+need to track how many ab edges used since double edges are allowed
+todo: need adj list rep of MST to run Explore to ensure connectivity
+todo: some input graphs are not connected
+'''
 class Solution:
     def maxNumEdgesToRemove(self, n, edges):
         '''
@@ -9,205 +16,184 @@ class Solution:
         :param edges:
         :return: num edges to remove
         '''
-        # Alice 1
-        person = 'Alice'
-        a_wt_edges = self.assign_weights(person, edges)
-        a_mst, num_AB_Alice, num_Alice_edges, a_visited = self.kruskal(a_wt_edges, n)
+        # union find data structure
+        # no 0 vertex so extend by one
+        pi_al = [i for i in range(n+1)]
+        rank_al = [0 for x in range(n+1)]
+        pi_bob = [i for i in range(n+1)]
+        rank_bob = [0 for x in range(n+1)]
 
-        # check that each vertex has at least one edge
-        #use dummy variables for u and v
-        dummy_u = 1
-        dummy_v = 2
-        connected = self.explore(a_mst, dummy_u, check_connected=True)
-        if not connected:
+        # get 2 edge lists
+        al_edges, bob_edges, len_ab_edges = self.assign_weights(edges)
+        # must check if msts are complete
+        al_mst, ab_count_al = self.kruskal_uf(al_edges, len_ab_edges, pi_al, rank_al)
+        bob_mst, ab_count_bob = self.kruskal_uf(bob_edges, len_ab_edges, pi_bob, rank_bob)
+        assert ab_count_al == ab_count_bob, \
+            f"ab_al {ab_count_al} ab_bob {ab_count_bob}"
+        # make graph
+        graph_al = self.make_graph(al_mst, n)
+        #check connectivity
+        al_connected = self.dfs(graph_al, n)
+        # make graph
+        graph_bob = self.make_graph(bob_mst, n)
+        # check connectivity
+        bob_connected = self.dfs(graph_bob, n)
+
+        # run DFS on mst's to check connectivity to all u's in V
+        if not al_connected or not bob_connected:
             return -1
 
-        # Bob 2
-        person = 'Bob'
-        b_wt_edges = self.assign_weights(person, edges)
-        b_mst, num_AB_Bob, num_Bob_edges, b_visited = self.kruskal(b_wt_edges, n)
+        # find how many al and bob edges were used
+        len_al = len(al_mst)
+        num_al_edges = len_al - ab_count_al
+        len_bob = len(bob_mst)
+        num_bob_edges = len_bob - ab_count_bob
 
-        connected = self.explore(b_mst, dummy_u, check_connected=True)
-
-        if not connected:
-            return -1
-
+        #ab's get used first so add al and bob to ab
+        assert num_al_edges == num_bob_edges, \
+            f"num_al_edges {num_al_edges}, num_bob_edges {num_bob_edges}"
+        total_edges_used = ab_count_al + num_al_edges + num_bob_edges
 
         total_graph_edges = len(edges)
 
-        #if num_AB_Alice == num_AB_Bob:
-        # num AB edges should be the same
-        combined_edges = num_AB_Alice + num_Alice_edges + num_Bob_edges
-        num_remove = total_graph_edges - combined_edges
-
-
+        num_remove = total_graph_edges - total_edges_used
 
         return num_remove
 
-    def kruskal(self, wt_edges, n):
+    def make_graph(self, person_mst, n):
         '''
-        run Kruskal, add lightest edge if it does not make cycle
-        keep track of visited, run explore once all v's visited
-        if explore returns True, break and return since MST is connected
-        todo: exit when mst is connected
-        :param wt_edges:
-        :return: mst, num edges AB
+        Double and triple edges possible.  Make separate graphs for Al and Bob
+        :param edges:
+        :param n:
+        :return: adj list representation of graph {u: [all dst v's]}
         '''
-        # 0 indexing leave zero with no edges
-        # check connectivity here not call explore again
-        visited = [-1 for x in range(n+1)]
+        edges = [tuple(x) for x in person_mst]
+        graph = {i:[] for i in range(n+1)}
+        for i in range(len(edges)):
+            e = edges[i]
+            u = e[0]
+            v = e[1]
+            # don't care about doubles because I'll check with "in"
+            graph[u].append(v)
+            graph[v].append(u)
+
+        return graph
+
+    def dfs(self, person_mst, n):
+        '''
+        run DFS from any vertex to make sure MST is connected (all verts)
+        return False if DFS cannot visit every vertex from v1
+        person_mst is adj list now
+        '''
+        visited = [0 for i in range(n+1)]
         visited[0] = 1
+        # start at 1
+        stack = [1]
 
-        mst = {i:[] for i in range(1, n+1)}
-        num_AB = 0
-        num_persons_edges = 0
-        for i in range(len(wt_edges)):
-            low_edge = wt_edges.pop(0)
-            curr_wt, u, v = low_edge[0], low_edge[1], low_edge[2]
-            # for speedup
-            if i == 0: #or i == 1:
-                makes_cycle = False
-            else:
-                makes_cycle = self.explore(mst, u, v)
-
-            if makes_cycle:
-                continue
-            # no cycle so add edge
-            mst[u].append(v)
-            #undirected so add other direction
-            mst[v].append(u)
-
+        while stack:
+            u = stack.pop(-1)
             visited[u] = 1
-            visited[v] = 1
+            edges = person_mst[u]
+            for i in range(len(edges)):
+                v = edges[i]
+                if not visited[v]:
+                    stack.append(v)
+        if 0 in visited:
+            return False
+        return True
 
-            if curr_wt is 1:
-                num_AB += 1
-            else:
-                num_persons_edges +=1
 
-            # check if MST is connected if all v's are at least visited
-            # still could be missing edges crossing the cut from S to S'
-            # if connected, break
-            if -1 not in visited:
-                if self.explore(mst, 1, check_connected=True):
-                    break
+    def are_connected(self, u, v, pi):
+        root_u = self.find(u, pi)
+        root_v = self.find(v, pi)
+        if root_u == root_v:
+            return True
+        return False
 
-        return mst, num_AB, num_persons_edges, visited
+    def find(self, vert, pi):
+        """
+        Todo: Try to make this iterative
+        :param vert: vertex to find parent for
+        :param pi: array of parent for each vertex
+        :return: vert's parent
+        """
+        if vert != pi[vert]:
+            pi[vert] = self.find(pi[vert], pi)
 
-    def explore(self, graph, u, v=None, check_connected=False):
-        '''
-        if explore reaches v from u, the edge being considered would create a cycle
-        :param mst:
+        return pi[vert]
+
+    def union(self, u, v, pi, rank):
+        """
+        build union and maintain rank
         :param u:
         :param v:
+        :return:
+        """
+        root_u = self.find(u, pi)
+        root_v = self.find(v, pi)
+
+        if root_u == root_v:
+            return# are connected, have same root
+        if rank[root_u] > rank[root_v]:
+            pi[root_v] = root_u
+        else:
+            pi[root_u] = root_v
+            if rank[root_u] == rank[root_v]:
+                rank[root_v] += 1
+
+    def kruskal_uf(self, sorted_edges, len_ab_edges,pi, rank):
+        '''
+        sets are unordered so use list of sets for edges
+        :param sorted_edges:
         :param n:
         :return:
         '''
-        # 0 indexing
-        visited = [0 for x in range(0, len(graph)+1)]
-        stack = [u]
-        while stack:
-            start = stack.pop()
-            visited[start] = 1
-            dst_vertices = graph[start]
-            for vert in dst_vertices:
-                if not visited[vert]:
-                    stack.append(vert)
+        MST = []
 
-        if check_connected:
-            visited[0] = 1
-            if 0 in visited: #return False if there are any unvisited vertices
-                return False
+        ab_count = 0
+        for i in range(len(sorted_edges)):
+            e = sorted_edges[i]
+            #todo: no wt so change indices
+            u = e[0]
+            v = e[1]
+            if self.are_connected(u,v, pi):
+                continue #can't use this edge
+            else:
+                self.union(u,v,pi, rank)
+            MST.append({u,v})
 
-            return True #'connected'
+            if i < len_ab_edges:
+                ab_count += 1
 
-        else:
-            if visited[v]:
-                return True # makes cycle
+        return MST, ab_count
 
-        return False
-
-    def filter_edges(self, edges):
-        '''
-        todo: need a lot of optimizations so not iterating all edges,
-        todo: check if mst is complete after AB edges, then A or B edges
-        todo: replace assign weights with this function
-        Filter edges by AB, A and B, return to main
-        :param edges:
-        :return:
-        '''
-        num_edges = len(edges)
-        '''
-        More possible optimizations
-        a_edges = [0 for x in range(num_edges)]
-        b_edges = [0 for x in range(num_edges)]
-        ab_edges = [0 for x in range(num_edges)]
-        '''
-        a_edges =[x for x in edges if x[0] is 1]
-        len_a = len(a_edges)
-        alice_edges = (len_a, a_edges)
-        b_edges = [x for x in edges if x[0] is 2]
-        len_b = len(b_edges)
-        bob_edges = (len_b, b_edges)
-        ab_edges = [x for x in edges if x[0] is 3]
-        len_ab = len(ab_edges)
-        both_edges = (len_ab, ab_edges)
-
-        '''
-        for i in range(num_edges):
-            curr_edge = edges[i]
-            edge_type = curr_edge[0]
-            u = curr_edge[1]
-            v = curr_edge[2]
-            if edge_type is 1: # Alice
-                a_edges.append((u,v))
-            elif edge_type is 2:
-                b_edges.append((u,v))
-            elif edge_type is 3:
-                ab_edges.append((u,v))
-        '''
-        return alice_edges, bob_edges, ab_edges
-
-
-    def assign_weights(self, person, edges):
+    def assign_weights(self, edges):
         '''
 
         :param person:
         :param edges:
         :return:  list of lists of [wt, u, v]
         '''
-        #adj_matrix
-        #wt_edges = [[0 for x in range(len(edges[0]))] for y in range(len(edges))]
-        wt_edges = []
+
+        ab_edges = []
+        al_edges = []
+        bob_edges = []
+
         for i in range(len(edges)):
             curr_edge = edges[i]
             edge_type = curr_edge[0]
             u = curr_edge[1]
             v = curr_edge[2]
             if edge_type == 3:  #both A and B
-                wt_edges.append([1, u, v])
+                ab_edges.append((u, v))
             elif edge_type is 1:
-                if person is 'Alice':
-                    wt_edges.append([2,u,v])
-                else: # Bob so toss this edge
-                    continue
+                al_edges.append((u,v))
             elif edge_type is 2:
-                if person is 'Bob':
-                    wt_edges.append([2,u,v])
-                else: #Alice so toss this edge
-                    continue
+                bob_edges.append((u,v))
+        wt_edges_al = ab_edges + al_edges
+        wt_edges_bob = ab_edges + bob_edges
 
-        #wt_edges_sorted = self.sort_edges(wt_edges)
-        wt_edges_sorted = sorted(wt_edges, key=lambda x: x[0])
-
-        return wt_edges_sorted
-
-    def sort_edges(self, edges):
-        sorted_edges = sorted(edges, key=lambda x:x[0])
-
-        return sorted_edges
-
-
+        return wt_edges_al, wt_edges_bob, len(ab_edges)
 
 
 if __name__=="__main__":
@@ -217,7 +203,9 @@ if __name__=="__main__":
     edges = [[3, 1, 2], [3, 2, 3], [1, 1, 3], [1, 2, 4], [1, 1, 2], [2, 3, 4]]
     #output = 2
     print(sol.maxNumEdgesToRemove(n, edges))
+
     n = 4
+    #todo: double edge 1-4 and 1-4 for al and bob
     edges = [[3, 1, 2], [3, 2, 3], [1, 1, 4], [2, 1, 4]]
     #output = 0
     print(sol.maxNumEdgesToRemove(n, edges))
@@ -231,8 +219,10 @@ if __name__=="__main__":
     edges = [[3, 1, 2], [3, 3, 4], [1, 1, 3], [2, 2, 4]]
     print(sol.maxNumEdgesToRemove(n, edges))
     # 0
+
     n = 4
     edges = [[3, 1, 2], [3, 3, 4]]
+    #todo: 2-3 missing
     print(sol.maxNumEdgesToRemove(n, edges))
     # -1
 
