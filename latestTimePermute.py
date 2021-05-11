@@ -1,7 +1,8 @@
 '''
 https://www.codeproject.com/Tips/1275693/Recursive-Permutations-in-Python
 '''
-
+from recviz import recviz
+from visualiser.visualiser import Visualiser as vs
 class Solution:
     def largestTimeFromDigits(self, arr: list) -> str:
         '''
@@ -42,22 +43,63 @@ class Solution:
         :return:
         '''
 
+    #@recviz
+    @vs(node_properties_kwargs={"shape": "record", "color": "#f57542", "style": "filled", "fillcolor": "grey"})
+    def combinations_list(self, colors):
+        '''
+        https://www.w3resource.com/python-exercises/list/python-data-type-list-exercise-149.php
+        :param colors:
+        :return:
+        '''
+        if len(colors) == 0:
+            return [[]]
+        result = []
+        for el in self.combinations_list(colors[1:]):
+            temp = el + [colors[0]]
+            print(f'el:{el}, temp: {temp}')
+            result += [el, el + [colors[0]]]
+            print(f'res: {result}')
+        return result
+
+# standalone version
+#@recviz
+@vs(node_properties_kwargs={"shape": "record", "color": "#f57542", "style": "filled", "fillcolor": "grey"})
+def combinations_list(colors):
+    '''
+    https://www.w3resource.com/python-exercises/list/python-data-type-list-exercise-149.php
+    :param colors:
+    :return:
+    '''
+    if len(colors) == 0:
+        return [[]]
+    result = []
+    for el in combinations_list(colors[1:]):
+        temp = el + [colors[0]]
+        print(f'el:{el}, temp: {temp}')
+        result += [el, el + [colors[0]]]
+        print(f'res: {result}')
+    return result
+
+
+    #colors = ['orange', 'red', 'green', 'blue']
 
 if __name__=="__main__":
     sol = Solution()
     # Driver program to test above function
     data = list('1234')
-    for p in sol.permute(data):
-        print(p)
+    #for p in sol.permute(data):
+     #   print(p)
 
     ans = sol.permute(data)
-    print(f'ans: {ans}')
+    #print(f'ans: {ans}')
     all_arrs = []
     for answer in ans:
         all_arrs.append(list(answer))
-    print(all_arrs)
-    print('combos')
-    print(sol.combinations(data))
+    #print(all_arrs)
+    #print('combos')
+    #print(sol.combinations(data))
+    #print(sol.combinations_list(data))
+    print(combinations_list(data))
 
     arr = [1, 2, 3, 4]
     #23:41
